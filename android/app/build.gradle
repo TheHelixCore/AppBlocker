@@ -77,6 +77,10 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    buildFeatures {
+        aidl true
+    }
+
     namespace "com.appblocker"
     defaultConfig {
         applicationId "com.appblocker"
@@ -116,4 +120,14 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Android Keystore-backed encrypted storage for the two passwords + blocking state.
+    implementation("androidx.security:security-crypto:1.1.0")
+
+    // Lets this app run "am force-stop" with adb-shell-level privilege via the separate Shizuku
+    // app, once the user grants it - the only non-root way to actually force-stop a blocked
+    // app's process and clear its Recents/app-switcher entry (killBackgroundProcesses alone
+    // does neither reliably; confirmed by testing on a real device).
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 }

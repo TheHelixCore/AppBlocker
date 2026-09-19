@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AppBlocker</string>
+    <string name="accessibility_service_description">Lets AppBlocker notice when a blocked app opens so it can immediately send you back to the home screen.</string>
 </resources>

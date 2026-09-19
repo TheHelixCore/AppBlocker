@@ -1,45 +1,57 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, PermissionsAndroid, Platform, StatusBar, StyleSheet, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AppBlockerModule from './src/native/AppBlockerModule';
+import SetupScreen from './src/screens/SetupScreen';
+import HomeScreen from './src/screens/HomeScreen';
+import AppPickerScreen from './src/screens/AppPickerScreen';
+import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+type Screen = 'loading' | 'setup' | 'home' | 'appPicker' | 'changePasswords';
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+export default function App() {
+  const [screen, setScreen] = useState<Screen>('loading');
+
+  useEffect(() => {
+    (async () => {
+      if (Platform.OS === 'android' && Platform.Version >= 33) {
+        try {
+          await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS' as any);
+        } catch {
+          // Non-fatal: the foreground service just won't show a visible notification.
+        }
+      }
+      const hasPasswords = await AppBlockerModule.hasPasswordsSet();
+      setScreen(hasPasswords ? 'home' : 'setup');
+    })();
+  }, []);
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <View style={styles.flex}>
+        <StatusBar barStyle="light-content" />
+        {screen === 'loading' && (
+          <View style={styles.loading}>
+            <ActivityIndicator color="#fff" />
+          </View>
+        )}
+        {screen === 'setup' && <SetupScreen onDone={() => setScreen('home')} />}
+        {screen === 'appPicker' && <AppPickerScreen onBack={() => setScreen('home')} />}
+        {screen === 'changePasswords' && (
+          <ChangePasswordScreen onBack={() => setScreen('home')} />
+        )}
+        {screen === 'home' && (
+          <HomeScreen
+            onOpenAppPicker={() => setScreen('appPicker')}
+            onOpenChangePasswords={() => setScreen('changePasswords')}
+          />
+        )}
+      </View>
     </SafeAreaProvider>
   );
 }
 
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  flex: { flex: 1, backgroundColor: '#000' },
+  loading: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
 });
-
-export default App;

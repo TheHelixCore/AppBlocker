@@ -1,4 +1,113 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# AppBlocker
+
+A personal Android app-blocker: pick apps to block, and it kicks you back to the home screen
+the instant one of them tries to open. Two passwords gate it:
+
+- **Unlock Password** — pauses blocking for exactly 5 minutes (it re-enables itself
+  automatically), and is also asked for before AppBlocker's own Settings/uninstall screens
+  will let you through.
+- **Master Password** — disables blocking indefinitely, until you open the app and switch it
+  back on yourself. No password is needed to turn protection back *on*, only to turn it off.
+
+## How it actually works (read this before relying on it)
+
+Android gives no app the ability to prevent another app's process from starting, or to kill an
+arbitrary foreground app, without root. What every non-root "app blocker"/parental-control app
+(this one included) actually does is react the instant the blocked app's window appears:
+
+- **`AppBlockAccessibilityService`** (`android/app/src/main/java/com/appblocker/`) is an
+  `AccessibilityService` that gets a callback on every foreground window change, system-wide.
+  If the new foreground package is on your blocked list (and blocking is currently active), it
+  immediately calls `performGlobalAction(GLOBAL_ACTION_HOME)` — so the blocked app is visible
+  for a frame at most, not truly prevented from ever starting. It listens for both
+  `TYPE_WINDOW_STATE_CHANGED` and `TYPE_WINDOWS_CHANGED` — the first alone misses a real case,
+  confirmed on a Samsung/OneUI device: resuming an already-running blocked app from the
+  Recents/app-switcher doesn't always fire it, which would let the app back in unblocked.
+- **Optional: force-stopping the blocked app via [Shizuku](https://shizuku.rikka.app/).**
+  `GLOBAL_ACTION_HOME` only backgrounds the app — its process survives, and killing it via the
+  public `ActivityManager.killBackgroundProcesses()` API is unreliable (confirmed: it silently
+  no-ops on a still-recently-used process in practice). The only way to genuinely force-stop
+  another app without root is to run with adb-shell privilege, which
+  [Shizuku](https://github.com/RikkaApps/Shizuku) provides to a normal app once the user installs
+  it and starts its privileged server. `ShizukuBridge.kt` binds a tiny `AppBlockerUserService`
+  (see the AIDL interface `IAppBlockerUserService`) that shells out to `am force-stop <pkg>` with
+  that privilege. This is entirely optional — if Shizuku isn't installed or hasn't been granted,
+  blocking still works via the accessibility service alone, just without the force-stop.
+  **Known limitation, confirmed by testing, not fixable from here**: even a genuine, verified
+  force-stop (confirmed via the process actually dying, and independently via WorkManager's own
+  "Application was force-stopped, rescheduling" log) does **not** clear the app's card from the
+  Recents/app-switcher list on this Android version — Recents entries are decoupled from process
+  liveness at the OS level, and there is no supported (or even `adb shell`-accessible) API to
+  remove one; `ActivityManager.removeTask()` is signature-permission-gated and `am help` has no
+  public subcommand for it (only whole-*stack* removal, which is the wrong tool). The card sitting
+  there is inert, though: tapping it forces a genuine cold start of a dead task, which the
+  accessibility service catches immediately, confirmed live — no crash, just an instant re-block.
+  A first attempt at clearing the card a different way — driving the Recents UI itself via
+  accessibility APIs to find the card and dispatch a swipe-to-dismiss gesture — was tried and
+  removed: the gesture dispatched without error but didn't actually remove the card, and caused a
+  visible flash of the Recents screen on every block for no benefit.
+  **Setup, and a real ongoing cost**: install Shizuku, then start its privileged server (Settings
+  in the Shizuku app shows the exact one-line `adb shell <path-to-libshizuku.so>` command, or use
+  Android 11+'s on-device Wireless Debugging pairing screen), then grant it from AppBlocker's Home
+  screen ("Force-stop via Shizuku" under Optional). On a non-rooted device this server **does not
+  survive a reboot** — it must be manually restarted (reopen Shizuku, or rerun the adb command)
+  after every restart, or AppBlocker silently falls back to accessibility-only blocking (still
+  fully effective at preventing use, just without the force-stop/no lingering-card attempt).
+- Android will **not** let you enable this from code — the user has to flip it on once in
+  Settings > Accessibility (the Home screen has an "Enable" shortcut that deep-links there).
+  There is no way around this; it's an intentional Android security boundary.
+- **Uninstall protection is friction, not a hard block.** `AppAdminReceiver` makes the app a
+  Device Administrator, which forces the OS to require deactivating admin (Settings > Security
+  > Device admin apps) before an uninstall is even offered. The same accessibility service also
+  tries to detect when Settings/the package installer is showing a screen that mentions
+  AppBlocker and bounces back to the home screen — this is a best-effort heuristic (it matches
+  on visible text), not a guarantee. A determined user with ADB, Safe Mode, or a factory reset
+  can always remove it; nothing on unrooted Android can fully prevent that.
+- The 5-minute auto re-enable is scheduled with `AlarmManager` (survives the app being closed)
+  and re-armed on boot by `BootReceiver`, so it doesn't depend on the app process staying alive.
+- Both passwords are salted+hashed (PBKDF2-HMAC-SHA256) and stored in
+  `EncryptedSharedPreferences` (Android Keystore-backed) — see `SecurePrefs.kt`. Nothing reads
+  or stores a raw password anywhere.
+
+## First run checklist
+
+1. Open `android/` in Android Studio (or `npx react-native run-android` with a device/emulator
+   connected) and install the app.
+2. On first launch you'll set both passwords (min 8 characters, must be different from each
+   other — there is no recovery flow if you forget them, by design).
+3. From the Home screen, tap **Enable** next to "Accessibility service" and turn AppBlocker on
+   in the system screen that opens. Blocking does nothing until this is on.
+4. Tap **Activate** next to "Device admin" to add the uninstall friction.
+5. Tap **Blocked apps** and pick which apps to block.
+6. Optional: install [Shizuku](https://shizuku.rikka.app/), start its privileged server (see the
+   Shizuku section above — it needs restarting after every reboot on a non-rooted device), then
+   tap **Enable** next to "Force-stop via Shizuku" under Optional. Skip this and blocking still
+   works fine, just without the force-stop.
+
+## Project layout
+
+- `App.tsx`, `src/` — the React Native UI (setup, home dashboard, app picker, change-password
+  screen). No third-party UI/navigation libraries — screens are switched with plain `useState`
+  to keep the native build surface as small as possible.
+- `android/app/src/main/java/com/appblocker/` — all the native logic: the accessibility
+  service, the foreground service + notification, the boot receiver, the device-admin receiver,
+  the encrypted password/state store, `ShizukuBridge.kt` + `AppBlockerUserService.kt` (the
+  optional force-stop path, see above), and `AppBlockerModule.kt` (the React Native bridge that
+  exposes all of the above to `src/native/AppBlockerModule.ts`).
+- iOS has none of this — Apple's platform doesn't expose the APIs this relies on (no
+  accessibility-service-style foreground-app callback, no device-admin-style uninstall friction)
+  — the `ios/` folder is just the unused React Native template.
+
+## Note on this being React Native
+
+The blocking/uninstall-guard mechanism itself is 100% native Android code (Kotlin) — there is
+no JavaScript-only way to watch foreground app changes or hook Device Admin. React Native here
+only supplies the UI layer on top of that native module. This also means Expo Go **will not
+work** for this project (it only supports Expo's fixed set of built-in native modules); this is
+a plain React Native CLI ("bare") project specifically so the custom native module can live
+directly in `android/`.
+
+---
 
 # Getting Started
 
