@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppBlockerModule, { InstalledApp } from '../native/AppBlockerModule';
+import PasswordPromptModal from '../components/PasswordPromptModal';
 
 interface Props {
   onBack: () => void;
@@ -20,9 +21,11 @@ interface Props {
 export default function AppPickerScreen({ onBack }: Props) {
   const [apps, setApps] = useState<InstalledApp[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [initialBlocked, setInitialBlocked] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState('');
+  const [showUnblockConfirm, setShowUnblockConfirm] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -33,6 +36,7 @@ export default function AppPickerScreen({ onBack }: Props) {
       installed.sort((a, b) => a.appName.localeCompare(b.appName));
       setApps(installed);
       setSelected(new Set(blocked));
+      setInitialBlocked(new Set(blocked));
       setLoading(false);
     })();
   }, []);
@@ -57,7 +61,7 @@ export default function AppPickerScreen({ onBack }: Props) {
     });
   };
 
-  const save = async () => {
+  const persist = async () => {
     setSaving(true);
     try {
       await AppBlockerModule.setBlockedApps(Array.from(selected));
@@ -65,6 +69,18 @@ export default function AppPickerScreen({ onBack }: Props) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const save = () => {
+    // Un-blocking an app (removing it from the previously-saved list) is a permanent,
+    // security-relevant change - it needs the master password, same as the master override.
+    // Adding new apps to the block list needs nothing extra, since that only restricts further.
+    const isUnblockingSomething = Array.from(initialBlocked).some(pkg => !selected.has(pkg));
+    if (isUnblockingSomething) {
+      setShowUnblockConfirm(true);
+      return;
+    }
+    persist();
   };
 
   return (
@@ -125,6 +141,23 @@ export default function AppPickerScreen({ onBack }: Props) {
           )}
         />
       )}
+
+      <PasswordPromptModal
+        visible={showUnblockConfirm}
+        title="Confirm with Master Password"
+        message="You're removing at least one app from the blocked list. This needs the master password."
+        submitLabel="Save"
+        onCancel={() => setShowUnblockConfirm(false)}
+        onSubmit={async pw => {
+          const ok = await AppBlockerModule.verifyMasterPassword(pw);
+          if (!ok) {
+            return { ok: false, error: 'Incorrect master password' };
+          }
+          setShowUnblockConfirm(false);
+          await persist();
+          return { ok: true };
+        }}
+      />
     </SafeAreaView>
   );
 }

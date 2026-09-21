@@ -4,10 +4,17 @@ A personal Android app-blocker: pick apps to block, and it kicks you back to the
 the instant one of them tries to open. Two passwords gate it:
 
 - **Unlock Password** — pauses blocking for exactly 5 minutes (it re-enables itself
-  automatically), and is also asked for before AppBlocker's own Settings/uninstall screens
-  will let you through.
+  automatically), is also asked for before AppBlocker's own Settings/uninstall screens will let
+  you through, and gates the app's own UI: opening AppBlocker (or switching back to it after
+  backgrounding it) always shows a lock screen demanding this password before showing any
+  settings at all. Without this, anyone with the phone unlocked could freely edit the
+  blocked-apps list with no friction whatsoever - a real gap found by using the app, not
+  something caught by building it.
 - **Master Password** — disables blocking indefinitely, until you open the app and switch it
-  back on yourself. No password is needed to turn protection back *on*, only to turn it off.
+  back on yourself (no password needed for that direction, only to turn it off), and is also
+  required to remove any app from the blocked list. Adding an app needs nothing extra - only
+  restricting further is free; un-blocking something already blocked is exactly as
+  security-sensitive as the master override, so it's gated the same way.
 
 ## How it actually works (read this before relying on it)
 
@@ -97,6 +104,17 @@ arbitrary foreground app, without root. What every non-root "app blocker"/parent
 - iOS has none of this — Apple's platform doesn't expose the APIs this relies on (no
   accessibility-service-style foreground-app callback, no device-admin-style uninstall friction)
   — the `ios/` folder is just the unused React Native template.
+- `App.tsx` re-locks (shows `src/screens/LockScreen.tsx`) on cold start and on every genuine
+  return from the background - deliberately debounced (`SPURIOUS_BACKGROUND_THRESHOLD_MS` in
+  `App.tsx`) against a real false-positive found live: React Native's Android `AppState`
+  briefly reports non-'active' when a native `Modal` (e.g. the master-password confirmation
+  dialog) opens, even though the app never actually left the foreground - without the debounce,
+  confirming a master password re-locked the app out from under itself mid-confirmation.
+  Separately, on a memory-constrained device under heavy load, Android can outright kill and
+  restart the app's process in the background; when that happens a fresh cold start correctly
+  shows the lock screen again too (confirmed via logcat: `Running "AppBlocker"` firing a second
+  time) - that one isn't a bug to fix, re-locking after a real process restart is the exact
+  behavior you'd want.
 
 ## Note on this being React Native
 
