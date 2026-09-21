@@ -4,10 +4,10 @@ import {
   Modal,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import PasswordField from './PasswordField';
 
 interface Props {
   visible: boolean;
@@ -69,11 +69,10 @@ export default function PasswordPromptModal({
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
           {message ? <Text style={styles.message}>{message}</Text> : null}
-          <TextInput
-            style={styles.input}
+          <PasswordField
+            containerStyle={styles.input}
             placeholder="Password"
             placeholderTextColor="#8a8a8a"
-            secureTextEntry
             autoFocus
             value={password}
             onChangeText={setPassword}

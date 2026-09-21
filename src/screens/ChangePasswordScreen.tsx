@@ -1,14 +1,8 @@
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppBlockerModule from '../native/AppBlockerModule';
+import PasswordField from '../components/PasswordField';
 
 interface Props {
   onBack: () => void;
@@ -82,9 +76,8 @@ export default function ChangePasswordScreen({ onBack }: Props) {
         <View style={styles.gate}>
           <Text style={styles.heading}>Enter Master Password</Text>
           <Text style={styles.subheading}>Required to change either password.</Text>
-          <TextInput
-            style={styles.input}
-            secureTextEntry
+          <PasswordField
+            containerStyle={styles.input}
             value={masterPw}
             onChangeText={setMasterPw}
             placeholder="Master password"
@@ -115,9 +108,8 @@ export default function ChangePasswordScreen({ onBack }: Props) {
 
       <View style={styles.section}>
         <Text style={styles.label}>New Unlock Password</Text>
-        <TextInput
-          style={styles.input}
-          secureTextEntry
+        <PasswordField
+          containerStyle={styles.input}
           value={newLongPw}
           onChangeText={setNewLongPw}
           placeholder="At least 8 characters"
@@ -130,9 +122,8 @@ export default function ChangePasswordScreen({ onBack }: Props) {
 
       <View style={styles.section}>
         <Text style={styles.label}>New Master Password</Text>
-        <TextInput
-          style={styles.input}
-          secureTextEntry
+        <PasswordField
+          containerStyle={styles.input}
           value={newMasterPw}
           onChangeText={setNewMasterPw}
           placeholder="At least 8 characters"

@@ -1,14 +1,8 @@
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppBlockerModule from '../native/AppBlockerModule';
+import PasswordField from '../components/PasswordField';
 
 interface Props {
   onUnlocked: () => void;
@@ -53,9 +47,8 @@ export default function LockScreen({ onUnlocked }: Props) {
         <Text style={styles.subheading}>
           Enter your unlock password to view or change settings.
         </Text>
-        <TextInput
-          style={styles.input}
-          secureTextEntry
+        <PasswordField
+          containerStyle={styles.input}
           value={password}
           onChangeText={setPassword}
           placeholder="Unlock password"

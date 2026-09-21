@@ -6,11 +6,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppBlockerModule from '../native/AppBlockerModule';
+import PasswordField from '../components/PasswordField';
 
 interface Props {
   onDone: () => void;
@@ -67,17 +67,15 @@ export default function SetupScreen({ onDone }: Props) {
         </Text>
 
         <Text style={styles.label}>Unlock Password</Text>
-        <TextInput
-          style={styles.input}
-          secureTextEntry
+        <PasswordField
+          containerStyle={styles.input}
           value={longPw}
           onChangeText={setLongPw}
           placeholder="At least 8 characters"
           placeholderTextColor="#8a8a8a"
         />
-        <TextInput
-          style={styles.input}
-          secureTextEntry
+        <PasswordField
+          containerStyle={styles.input}
           value={longPwConfirm}
           onChangeText={setLongPwConfirm}
           placeholder="Confirm unlock password"
@@ -85,17 +83,15 @@ export default function SetupScreen({ onDone }: Props) {
         />
 
         <Text style={[styles.label, styles.labelSpaced]}>Master Password</Text>
-        <TextInput
-          style={styles.input}
-          secureTextEntry
+        <PasswordField
+          containerStyle={styles.input}
           value={masterPw}
           onChangeText={setMasterPw}
           placeholder="Different from the unlock password"
           placeholderTextColor="#8a8a8a"
         />
-        <TextInput
-          style={styles.input}
-          secureTextEntry
+        <PasswordField
+          containerStyle={styles.input}
           value={masterPwConfirm}
           onChangeText={setMasterPwConfirm}
           placeholder="Confirm master password"
